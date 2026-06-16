@@ -887,10 +887,18 @@ function renderCal(){
   document.getElementById('cal-grid').innerHTML=cells.map(function(c){
     if(!c)return'<div></div>';
     var evts=S.ev.filter(function(e){return e.data===c});
+    var diff=du(c);
+    var isUrgent=evts.length>0&&diff>=0&&diff<=3&&c!==today;
+    var isLate=evts.length>0&&diff<0&&c!==today;
     var cls='cd'+(c===today?' today':c===S.sd?' sel':'');
     var dn=parseInt(c.split('-')[2]);
     var dots=evts.slice(0,4).map(function(e){return'<div class="cdot" style="background:'+tc(e.tipo)+'"></div>'}).join('');
-    return'<div class="'+cls+'" onclick="selDay(\''+c+'\')"><div class="cdn2"'+( c===today?' style="color:var(--ac)"':'')+'>'+dn+'</div><div class="cdots">'+dots+'</div></div>';
+    var urgStyle='';
+    if(isLate) urgStyle='background:rgba(239,68,68,.13);border-color:rgba(239,68,68,.4);';
+    else if(isUrgent) urgStyle='background:rgba(245,158,11,.13);border-color:rgba(245,158,11,.4);';
+    var dnStyle=isLate?'color:#ef4444;font-weight:800':isUrgent?'color:#f59e0b;font-weight:800':(c===today?'color:var(--ac)':'');
+    var pulse=isUrgent||isLate?'<div style="width:5px;height:5px;border-radius:50%;background:'+(isLate?'#ef4444':'#f59e0b')+';box-shadow:0 0 5px '+(isLate?'#ef4444':'#f59e0b')+';position:absolute;top:4px;right:4px;animation:blink 1.4s infinite"></div>':'';
+    return'<div class="'+cls+'" onclick="selDay(\''+c+'\')" style="position:relative;'+urgStyle+'">'+pulse+'<div class="cdn2" style="'+dnStyle+'">'+dn+'</div><div class="cdots">'+dots+'</div></div>';
   }).join('');
   renderDayPanel();renderUpcoming();
 }
@@ -904,7 +912,15 @@ function renderDayPanel(){
   var evts=S.ev.filter(function(e){return e.data===S.sd}).sort(function(a,b){return(a.ini||'').localeCompare(b.ini||'')});
   var el=document.getElementById('day-evts');
   if(evts.length===0){el.innerHTML='<div class="es" style="padding:16px"><span class="es-ic">📅</span><span class="es-t">Sem compromissos<br><span style="color:var(--ac);cursor:pointer" onclick="openEvt()">+ Adicionar</span></span></div>';return}
-  el.innerHTML=evts.map(function(e){
+  var diff=du(S.sd);
+  var isLate=diff<0;
+  var isUrgent=diff>=0&&diff<=3;
+  var alertBar='';
+  if(isLate) alertBar='<div style="display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:7px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);margin-bottom:8px"><div style="width:6px;height:6px;border-radius:50%;background:#ef4444;box-shadow:0 0 6px #ef4444;animation:blink 1.4s infinite;flex-shrink:0"></div><span style="font-size:11px;font-weight:700;color:#ef4444">'+Math.abs(diff)+' dia'+(Math.abs(diff)!==1?'s':'')+' em atraso</span></div>';
+  else if(diff===0) alertBar='<div style="display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:7px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.3);margin-bottom:8px"><div style="width:6px;height:6px;border-radius:50%;background:var(--ac);box-shadow:0 0 6px var(--ac);animation:blink 1.4s infinite;flex-shrink:0"></div><span style="font-size:11px;font-weight:700;color:var(--ac)">Compromisso hoje</span></div>';
+  else if(isUrgent&&diff===1) alertBar='<div style="display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:7px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);margin-bottom:8px"><div style="width:6px;height:6px;border-radius:50%;background:#ef4444;box-shadow:0 0 6px #ef4444;animation:blink 1.4s infinite;flex-shrink:0"></div><span style="font-size:11px;font-weight:700;color:#ef4444">⚠ Amanhã!</span></div>';
+  else if(isUrgent) alertBar='<div style="display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:7px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);margin-bottom:8px"><div style="width:6px;height:6px;border-radius:50%;background:#f59e0b;box-shadow:0 0 6px #f59e0b;animation:blink 1.4s infinite;flex-shrink:0"></div><span style="font-size:11px;font-weight:700;color:#f59e0b">⏳ Faltam '+diff+' dias</span></div>';
+  el.innerHTML=alertBar+evts.map(function(e){
     var c=tc(e.tipo);
     return'<div class="ec" style="border-left-color:'+c+'">'+
       '<div class="eac"><button class="btn btn-g btn-sm" onclick="openEvt(\''+e.id+'\')">✏</button><button class="btn btn-g btn-sm" style="color:var(--er)" onclick="delEvt(\''+e.id+'\')">🗑</button></div>'+
@@ -925,7 +941,17 @@ function renderUpcoming(){
   if(up.length===0){el.innerHTML='<div style="font-size:12px;color:var(--txm);text-align:center;padding:8px">Nenhum evento futuro</div>';return}
   el.innerHTML=up.map(function(e){
     var c=tc(e.tipo);
-    return'<div class="ui" onclick="selDay(\''+e.data+'\')"><div class="ld" style="background:'+c+';flex-shrink:0"></div><span class="ut">'+exc(e.titulo)+'</span><span class="ud">'+fbr(e.data).slice(0,5)+'</span></div>';
+    var diff=du(e.data);
+    var isToday=e.data===today;
+    var isUrgent=!isToday&&diff<=3;
+    var urgBg=isToday?'rgba(37,99,235,.07)':isUrgent&&diff<=1?'rgba(239,68,68,.07)':isUrgent?'rgba(245,158,11,.07)':'';
+    var urgBorder=isToday?'':'';
+    var diffLabel=isToday?'<span style="padding:1px 5px;border-radius:3px;font-size:10px;font-weight:800;background:rgba(37,99,235,.12);color:var(--ac);border:1px solid rgba(37,99,235,.3)">Hoje</span>':diff===1?'<span style="padding:1px 5px;border-radius:3px;font-size:10px;font-weight:800;background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.3)">⚠ Amanhã</span>':diff<=3?'<span style="padding:1px 5px;border-radius:3px;font-size:10px;font-weight:800;background:rgba(245,158,11,.12);color:#f59e0b;border:1px solid rgba(245,158,11,.3)">⏳ '+diff+' dias</span>':'';
+    return'<div class="ui" onclick="selDay(\''+e.data+'\')" style="background:'+urgBg+';border-radius:6px;margin-bottom:2px">'+
+      '<div class="ld" style="background:'+c+';flex-shrink:0"></div>'+
+      '<span class="ut">'+exc(e.titulo)+'</span>'+
+      (diffLabel?diffLabel:'<span class="ud">'+fbr(e.data).slice(0,5)+'</span>')+
+    '</div>';
   }).join('');
 }
 
